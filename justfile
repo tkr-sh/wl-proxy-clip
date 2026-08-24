@@ -27,13 +27,18 @@ nix-run:
 [group: 'check']
 check:
     cargo check
-    cargo fmt
+    cargo fmt --check
     try { cargo nextest run }
     cargo clippy
-    taplo fmt
+    taplo fmt --check
+
 
 [group: 'check']
-fix:
+fix: fmt
     cargo clippy --fix --allow-staged
+
+[group: 'check']
+fmt:
     cargo fmt
     taplo fmt
+    nix fmt flake.nix
