@@ -76,3 +76,7 @@ ci-build:
 
 [group: 'ci']
 ci: ci-fmt ci-machete ci-deny ci-check ci-clippy ci-test ci-build
+
+[group: 'release']
+release version:
+    nu ./scripts/release.nu {{version}}
