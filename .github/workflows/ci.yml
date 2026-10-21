@@ -57,9 +57,13 @@ jobs:
             - name: Build
               run: cargo build --locked --release
 
-            - name: Features
+            - name: Feature matrix
               run: |
                   cargo check --locked --all-targets --all-features
                   cargo clippy --locked --all-targets --all-features -- -D warnings
                   cargo nextest run --locked --all-features
                   cargo build --locked --release --all-features
+                  cargo check --locked --all-targets --no-default-features
+                  cargo clippy --locked --all-targets --no-default-features -- -D warnings
+                  cargo nextest run --locked --no-default-features
+                  cargo build --locked --release --no-default-features

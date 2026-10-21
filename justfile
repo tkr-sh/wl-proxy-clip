@@ -80,6 +80,10 @@ ci-features:
     cargo clippy --locked --all-targets --all-features -- -D warnings
     cargo nextest run --locked --all-features
     cargo build --locked --release --all-features
+    cargo check --locked --all-targets --no-default-features
+    cargo clippy --locked --all-targets --no-default-features -- -D warnings
+    cargo nextest run --locked --no-default-features
+    cargo build --locked --release --no-default-features
 
 [group: 'ci']
 ci: ci-fmt ci-machete ci-deny ci-check ci-clippy ci-test ci-build ci-features
