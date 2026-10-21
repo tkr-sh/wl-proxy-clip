@@ -36,7 +36,7 @@ def main [$version:string] {
     }
 
     git add ./Cargo.toml ./Cargo.lock
-    git commit -m $"🏷️ release: v($version)"
+    git commit --allow-empty -m $"🏷️ release: v($version)"
     git push origin main
     git tag $version
     git push origin tag $version
