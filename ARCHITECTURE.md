@@ -28,16 +28,18 @@ Clipboard transfer happens only when a command is sent to the control socket.
 
 ## Entry points and process model
 
-`src/main.rs` is intentionally small. It parses exactly three arguments:
+`src/main.rs` is intentionally small. It accepts three positional arguments
+and, in the default build, the CLI options:
 
 ```text
-wl-proxy-clip <name> <downstream-socket> <control-socket>
+wl-proxy-clip [OPTIONS] <name> <downstream-socket> <control-socket>
 ```
 
 It calls `wl_proxy_clip::run`, which is re-exported from `src/lib.rs`. Usage
-errors exit with status 2. Startup errors exit with status 1. With the `clap`
-feature, `main` parses the optional runtime settings and passes them to `run`;
-without it, `Settings::default()` is used.
+errors exit with status 2. Startup errors exit with status 1. The default build
+uses Clap to parse the runtime settings and passes them to `run`. A build made
+with `--no-default-features` accepts only the three positional arguments and
+uses `Settings::default()`.
 
 `src/lib.rs` declares the modules and the shared `Res<T>` type:
 
@@ -280,7 +282,8 @@ text:  1 MiB, 15 second timeout
 image: 16 MiB, 30 second timeout
 ```
 
-They can be overridden when the binary is built with the `clap` feature.
+They can be overridden by the CLI options in the default build. A build made
+with `--no-default-features` uses these defaults.
 
 `prepare` creates a pipe with `pipe2` and `O_CLOEXEC`, starts a reader thread,
 and injects `wl_data_source.send(mime, write_end)` into the client. The client
@@ -371,7 +374,7 @@ outputs, XDG shell, decorations, output management, viewport, fractional
 scaling, presentation, single-pixel buffers, cursor shapes, text input v3,
 `wl_data_device_manager`, pointer constraints, relative pointers, and tearing
 control. `zwp_linux_dmabuf_v1` is added when `Settings::should_support_gpu` is
-enabled, which is exposed as `--gpu` in the optional CLI.
+enabled, which is exposed as `--gpu` in the default CLI.
 
 Everything else is hidden. This includes input methods, screen capture, layer
 shell, session lock, foreign-toplevel and workspace management, output and
@@ -417,7 +420,7 @@ connection.
 
 ## Module map
 
-- `src/main.rs`: argument parsing, optional Clap CLI, and process exit codes.
+- `src/main.rs`: argument parsing, default Clap CLI, and process exit codes.
 - `src/lib.rs`: module list and public `run` entry point.
 - `src/server.rs`: listeners, control thread, connection workers.
 - `src/state.rs`: object tracking, clipboard state, command queue.

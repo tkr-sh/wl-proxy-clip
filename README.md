@@ -54,7 +54,7 @@ The control socket accepts one command per line:
 
 | Command | Effect |
 | --- | --- |
-| `paste` | Lends the host clipboard to the client for 15 seconds, text only. |
+| `paste` | Lends the host clipboard to the client, text only. |
 | `copy` | Reads the client selection and writes it to the host clipboard. |
 
 `copy` prefers a supported image when the client offers one, then falls back to
@@ -72,10 +72,10 @@ text. Commands apply to every active client connection.
 cargo build --release
 ```
 
-For the optional Clap-based CLI:
+Clap is enabled by default. For a minimal build without it:
 
 ```sh
-cargo build --release --features clap
+cargo build --release --no-default-features
 ```
 
 Or with Nix:
@@ -87,8 +87,11 @@ nix build
 ## Usage
 
 ```text
-wl-proxy-clip <name> <downstream-socket> <control-socket>
+wl-proxy-clip [OPTIONS] <name> <downstream-socket> <control-socket>
 ```
+
+The default build includes the CLI options described below. A build made with
+`--no-default-features` accepts only the three positional arguments.
 
 - `<name>` is only used in log messages.
 - `<downstream-socket>` is the Wayland socket that the client connects to.
@@ -116,9 +119,10 @@ printf 'paste\n' | socat - UNIX-CONNECT:"$XDG_RUNTIME_DIR/wl-proxy-clip-control"
 printf 'copy\n'  | socat - UNIX-CONNECT:"$XDG_RUNTIME_DIR/wl-proxy-clip-control"
 ```
 
-## Optional CLI
+## CLI options
 
-With the `clap` feature, every limit and timeout can be overridden:
+The default build includes a Clap-based CLI. Every limit and timeout can be
+overridden:
 
 | Option | Default |
 | --- | --- |
@@ -132,7 +136,8 @@ With the `clap` feature, every limit and timeout can be overridden:
 | `--gpu` | disabled |
 
 `--gpu` adds `zwp_linux_dmabuf_v1` to the global allowlist for GPU buffer
-forwarding. Without the `clap` feature, the defaults above are used.
+forwarding. A build made with `--no-default-features` uses the defaults above
+and has no command-line options.
 
 Run `wl-proxy-clip --help` for the generated help text.
 
@@ -142,7 +147,7 @@ Run `wl-proxy-clip --help` for the generated help text.
   `paste` remains text only.
 - The host clipboard is lent to the client for 15 seconds after `paste` by default.
 - Text `copy` has a 15 second timeout, a 1 MiB limit, and requires valid UTF-8.
-  These are the defaults and can be changed with the optional CLI.
+  These are the defaults and can be changed with the CLI options above.
 - Image `copy` has a 30 second timeout, a 16 MiB limit, and a 64 megapixel
   limit by default. PNG and JPEG headers are checked before the data is copied.
 - Image data is validated by header only and is not re-encoded. Host
