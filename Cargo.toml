@@ -16,7 +16,6 @@
     keywords = ["clipboard", "isolation", "proxy", "security", "wayland"]
     license = "GPL-3.0-or-later"
     name = "wl-proxy-clip"
-    readme = "README.md"
     repository = "https://github.com/tkr-sh/wl-proxy-clip"
     version = "0.1.0"
 
