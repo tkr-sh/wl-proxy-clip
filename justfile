@@ -42,3 +42,37 @@ fmt:
     cargo fmt
     taplo fmt
     nix fmt flake.nix
+
+# CI
+
+[group: 'ci']
+ci-fmt:
+    cargo fmt --check
+    taplo fmt --check
+
+[group: 'ci']
+ci-machete:
+    cargo machete
+
+[group: 'ci']
+ci-deny:
+    cargo deny check advisories bans licenses sources
+
+[group: 'ci']
+ci-check:
+    cargo check --locked --all-targets
+
+[group: 'ci']
+ci-clippy:
+    cargo clippy --locked --all-targets -- -D warnings
+
+[group: 'ci']
+ci-test:
+    cargo nextest run --locked
+
+[group: 'ci']
+ci-build:
+    cargo build --locked --release
+
+[group: 'ci']
+ci: ci-fmt ci-machete ci-deny ci-check ci-clippy ci-test ci-build

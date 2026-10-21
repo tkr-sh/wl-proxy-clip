@@ -1,0 +1,58 @@
+name: ci
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: ci-${{ github.ref }}
+    cancel-in-progress: true
+
+env:
+    CARGO_TERM_COLOR: always
+
+jobs:
+    check:
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: dtolnay/rust-toolchain@nightly
+              with:
+                  components: clippy, rustfmt
+
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: .
+
+            - uses: taiki-e/install-action@v2
+              with:
+                  tool: cargo-deny@0.20, cargo-machete, cargo-nextest, taplo
+
+            - name: Format
+              run: |
+                  cargo fmt --check
+                  taplo fmt --check
+
+            - name: Machete
+              run: cargo machete
+
+            - name: Deny
+              run: cargo deny check advisories bans licenses sources
+
+            - name: Check
+              run: cargo check --locked --all-targets
+
+            - name: Clippy
+              run: cargo clippy --locked --all-targets -- -D warnings
+
+            - name: Test
+              run: cargo nextest run --locked
+
+            - name: Build
+              run: cargo build --locked --release

@@ -1,0 +1,34 @@
+# <https://embarkstudios.github.io/cargo-deny/>
+
+[graph]
+    all-features = true
+
+[advisories]
+    ignore = []
+    unmaintained = "all"
+    unsound = "all"
+    version = 2
+    yanked = "deny"
+
+[licenses]
+    allow = [
+        "Apache-2.0 WITH LLVM-exception",
+        "Apache-2.0",
+        "GPL-3.0-or-later",
+        "MIT",
+        "Unicode-3.0",
+        "Unlicense",
+        "Zlib",
+    ]
+    confidence-threshold = 0.9
+    version = 2
+
+[bans]
+    multiple-versions = "warn"
+    wildcards = "deny"
+
+[sources]
+    allow-git = []
+    allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+    unknown-git = "deny"
+    unknown-registry = "deny"

@@ -128,6 +128,7 @@
                             bacon
                             cargo-nextest
                             cargo-machete
+                            cargo-deny
                             fd
                             ripgrep
                             nixfmt
