@@ -54,8 +54,8 @@ The control socket accepts one command per line:
 
 | Command | Effect |
 | --- | --- |
-| `paste` | Lends the host clipboard to the client, text only. |
-| `copy` | Reads the client selection and writes it to the host clipboard. |
+| `paste` | Lends the host clipboard to the client, including text and PNG/JPEG images. |
+| `copy` | Reads the client selection and writes text or a PNG/JPEG image to the host clipboard. |
 
 `copy` prefers a supported image when the client offers one, then falls back to
 text. Commands apply to every active client connection.
@@ -135,6 +135,9 @@ overridden:
 | `--idle-poll-interval <MILLISECONDS>` | 200 |
 | `--gpu` | disabled |
 
+The text and image size limits, copy timeouts, and pixel limit apply to `copy`.
+`paste-timeout` controls how long the host clipboard is lent to the client.
+
 `--gpu` adds `zwp_linux_dmabuf_v1` to the global allowlist for GPU buffer
 forwarding. A build made with `--no-default-features` uses the defaults above
 and has no command-line options.
@@ -143,16 +146,18 @@ Run `wl-proxy-clip --help` for the generated help text.
 
 ## Behavior and limits
 
-- Text, PNG, and JPEG selections are supported for `copy`. Host to client
-  `paste` remains text only.
-- The host clipboard is lent to the client for 15 seconds after `paste` by default.
+- Text and PNG/JPEG selections are supported in both directions. `paste`
+  lends host data to the client; `copy` reads the client selection.
+- The host clipboard is lent to the client after `paste`.
 - Text `copy` has a 15 second timeout, a 1 MiB limit, and requires valid UTF-8.
   These are the defaults and can be changed with the CLI options above.
 - Image `copy` has a 30 second timeout, a 16 MiB limit, and a 64 megapixel
   limit by default. PNG and JPEG headers are checked before the data is copied.
-- Image data is validated by header only and is not re-encoded. Host
-  applications still decode it, so treat images from the client as untrusted
-  input.
+- For `copy`, image data is validated by header only and is not re-encoded.
+  Host applications still decode it, so treat images from the client as
+  untrusted input.
+- For `paste`, image data is forwarded directly from the compositor and is not
+  validated or re-encoded by the proxy. The client decodes it.
 - GIF, WebP, and SVG are not supported. SVG is intentionally excluded.
 - Drag and drop is disabled in both directions.
 - Only an allowlist of globals is exposed to the client. Input methods, screen

@@ -19,15 +19,15 @@ mod cli {
         /// Control socket.
         control:    PathBuf,
 
-        /// Maximum text selection size in bytes.
+        /// Maximum text size for copy in bytes.
         #[arg(long, value_name = "BYTES", default_value_t = Settings::default().max_text_bytes)]
         max_text_bytes: usize,
 
-        /// Maximum image selection size in bytes.
+        /// Maximum image size for copy in bytes.
         #[arg(long, value_name = "BYTES", default_value_t = Settings::default().max_image_bytes)]
         max_image_bytes: usize,
 
-        /// Maximum image dimensions in pixels.
+        /// Maximum image dimensions for copy in pixels.
         #[arg(long, value_name = "PIXELS", default_value_t = Settings::default().max_image_pixels)]
         max_image_pixels: u64,
 

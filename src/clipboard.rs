@@ -3,7 +3,7 @@ use {
         config::{READ_BUFFER_SIZE, Settings},
         fd::{pipe, readable},
         image,
-        mime::{image_mime_for, is_text, text_mime_for},
+        mime::{image_mime_for, is_paste_mime, text_mime_for},
         state::{Command as ClipboardCommand, Connection, Loan},
         wire::{string_body, uint_body},
     },
@@ -89,10 +89,11 @@ pub(crate) fn prepare(connection: &Connection) -> Vec<Injection> {
                 if !state
                     .mimes
                     .get(&offer)
-                    // TODO: support images
-                    .is_some_and(|mimes| mimes.iter().any(|mime| is_text(mime)))
+                    .is_some_and(|mimes| mimes.iter().any(|mime| is_paste_mime(mime)))
                 {
-                    eprintln!("paste: the host clipboard does not contain text");
+                    eprintln!(
+                        "paste: the host clipboard does not contain text or a supported image"
+                    );
                     continue;
                 }
                 state.loan = Some(Loan {

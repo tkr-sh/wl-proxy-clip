@@ -6,12 +6,6 @@ pub(crate) const TEXT_MIMES: &[&str] = &[
     "STRING",
 ];
 
-pub(crate) fn is_text(mime: &str) -> bool {
-    TEXT_MIMES
-        .iter()
-        .any(|candidate| candidate.eq_ignore_ascii_case(mime))
-}
-
 pub(crate) fn text_mime_for(mimes: &[String]) -> Option<&'static str> {
     TEXT_MIMES.iter().copied().find(|candidate| {
         mimes
@@ -49,6 +43,15 @@ pub(crate) fn image_mime_for(mimes: &[String]) -> Option<ImageMime> {
     })
 }
 
+pub(crate) fn is_paste_mime(mime: &str) -> bool {
+    TEXT_MIMES
+        .iter()
+        .any(|candidate| mime.eq_ignore_ascii_case(candidate)) ||
+        IMAGE_MIMES
+            .iter()
+            .any(|candidate| mime.eq_ignore_ascii_case(candidate.request))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -73,5 +76,15 @@ mod tests {
 
         assert_eq!(image_mime_for(&mimes), None);
         assert_eq!(text_mime_for(&mimes), Some("text/plain"));
+    }
+
+    #[test]
+    fn recognizes_pasteable_mimes() {
+        assert!(is_paste_mime("text/plain"));
+        assert!(is_paste_mime("image/png"));
+        assert!(is_paste_mime("IMAGE/JPEG"));
+        assert!(is_paste_mime("image/jpg"));
+        assert!(!is_paste_mime("image/webp"));
+        assert!(!is_paste_mime("text/html"));
     }
 }

@@ -177,9 +177,9 @@ Wayland client behavior.
 - `wl_data_device.set_selection`: stores the source ID in `client_source` and
   drops the request. The compositor never learns the client selection.
 - `wl_data_offer.receive`: allowed only for the active loaned offer, before
-  expiration, and only for text. Anything else closes the connection. Closing
-  is deliberate because the request carries an fd and cannot be dropped
-  safely.
+  expiration, and only for supported text or image MIME types. Anything else
+  closes the connection. Closing is deliberate because the request carries an
+  fd and cannot be dropped safely.
 
 All other requests are forwarded.
 
@@ -236,7 +236,7 @@ The command requires:
 
 - a `wl_data_device` object, so the proxy knows where to inject the selection;
 - a `host_offer`, which is the host clipboard selection retained earlier;
-- at least one text MIME type advertised by that offer.
+- at least one supported text or image MIME type advertised by that offer.
 
 If those conditions hold, `prepare`:
 
@@ -245,13 +245,15 @@ If those conditions hold, `prepare`:
 
 The client can then request data from that offer. `filter::request` only
 allows `wl_data_offer.receive` while the loan is active, for the same offer,
-and for a text MIME type.
+and for a supported text or image MIME type.
 
 When the loan expires, `prepare` clears it and injects
 `wl_data_device.selection(null)`, which removes the selection from the client.
 
-Host to client `paste` is still text only. Image transfer is implemented only
-for `copy`.
+Host to client `paste` supports text, PNG, and JPEG. The proxy forwards
+`wl_data_offer.receive` to the compositor with the client-provided file
+descriptor, so image bytes are not read, validated, or re-encoded by the
+proxy. The client decodes them.
 
 ## `copy`
 
@@ -320,11 +322,14 @@ Image MIME entries have both a request name and a canonical name. This is why
 receives the standard `image/jpeg`.
 
 For `copy`, image MIME types are checked before text MIME types. For `paste`,
-only text MIME types are considered.
+both text and supported image MIME types are allowed during a loan.
 
 ## Image validation
 
-`src/image.rs` validates image headers without decoding the image.
+`src/image.rs` validates image headers without decoding the image. This
+validation runs on the `copy` path before data is written to the host
+clipboard. The `paste` path forwards image data directly to the client and
+does not validate it.
 
 PNG validation checks:
 
@@ -440,7 +445,7 @@ Unit tests cover:
 - disallowed and unadvertised global binding;
 - tracking of `wl_data_device_manager`;
 - refusal of unloaned host offer reads;
-- allowed text reads during a loan;
+- allowed text and image reads during a loan;
 - withholding the host selection event;
 - allowlisted global advertisement and removal, including the GPU opt-in;
 - MIME preference and JPEG alias canonicalization;

@@ -2,7 +2,7 @@ use {
     crate::{
         Res,
         config::{Settings, is_allowed_global},
-        mime::is_text,
+        mime::is_paste_mime,
         state::{GlobalInfo, ObjectKind, ProxyState},
         wire::{read_string, read_uint},
     },
@@ -101,13 +101,16 @@ pub(crate) fn request(state: &mut ProxyState, packet: &Packet, settings: Setting
             Verdict::Drop
         },
         // wl_data_offer.receive(mime, fd): only the active loan, while valid,
-        // and only for text. Dropping a message that carries an fd would
-        // desynchronize the fd queue, so terminate the connection instead.
+        // and only for supported text or image MIME types. Dropping a message
+        // that carries an fd would desynchronize the fd queue, so terminate
+        // the connection instead.
         (Some(ObjectKind::Offer), 1) => {
             let mime = read_string(&mut Cursor::new(packet.body.as_slice()))?;
             match state.loan {
                 Some(ref loan)
-                    if loan.offer == packet.id && Instant::now() < loan.until && is_text(&mime) =>
+                    if loan.offer == packet.id &&
+                        Instant::now() < loan.until &&
+                        is_paste_mime(&mime) =>
                 {
                     Verdict::Forward
                 },
@@ -341,6 +344,41 @@ mod tests {
             request(&mut state, &packet, Settings::default()).unwrap(),
             Verdict::Forward
         );
+    }
+
+    #[test]
+    fn allows_image_read_during_loan() {
+        let mut state = state_with(ObjectKind::Offer, 7);
+        state.loan = Some(Loan {
+            offer: 7,
+            until: Instant::now() + Duration::from_secs(1),
+        });
+        let packet = Packet {
+            id:     7,
+            opcode: 1,
+            body:   string_argument("image/png"),
+        };
+
+        assert_eq!(
+            request(&mut state, &packet, Settings::default()).unwrap(),
+            Verdict::Forward
+        );
+    }
+
+    #[test]
+    fn refuses_unsupported_image_read_during_loan() {
+        let mut state = state_with(ObjectKind::Offer, 7);
+        state.loan = Some(Loan {
+            offer: 7,
+            until: Instant::now() + Duration::from_secs(1),
+        });
+        let packet = Packet {
+            id:     7,
+            opcode: 1,
+            body:   string_argument("image/webp"),
+        };
+
+        assert!(request(&mut state, &packet, Settings::default()).is_err());
     }
 
     #[test]
