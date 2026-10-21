@@ -5,6 +5,36 @@
 </h1>
 
 
+<p align="center">
+    <a href="https://github.com/tkr-sh/wl-proxy-clip">
+        <img
+            src="https://img.shields.io/github/v/release/tkr-sh/wl-proxy-clip?colorA=363a4f&colorB=b7bdf8&style=for-the-badge&logo=github&logoColor=cad3f5"
+            alt="github release"
+        />
+    </a>
+    <a href="https://github.com/tkr-sh/wl-proxy-clip/actions">
+        <img
+            src="https://img.shields.io/github/actions/workflow/status/tkr-sh/wl-proxy-clip/ci.yml?branch=main&colorA=363a4f&colorB=a6da95&style=for-the-badge&logo=rust&logoColor=cad3f5"
+            alt="ci status"
+        />
+    </a>
+    <!--
+    <a href="https://crates.io/crates/wl-proxy-clip">
+        <img
+            src="https://img.shields.io/crates/d/wl-proxy-clip.svg?colorA=363a4f&colorB=b7bdf8&style=for-the-badge&logo=rust&logoColor=cad3f5"
+            alt="crates.io downloads"
+        />
+    </a>
+    -->
+    <a href="https://github.com/tkr-sh/wl-proxy-clip">
+        <img
+            src="https://img.shields.io/github/stars/tkr-sh/wl-proxy-clip?colorA=363a4f&colorB=eed49f&style=for-the-badge&logo=star"
+            alt="stars"
+        />
+    </a>
+</p>
+
+
 `wl-proxy-clip` is a small Wayland proxy that gives a client its own clipboard.
 It sits between a Wayland client and the host compositor.
 
