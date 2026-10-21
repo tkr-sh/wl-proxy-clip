@@ -35,7 +35,9 @@ wl-proxy-clip <name> <downstream-socket> <control-socket>
 ```
 
 It calls `wl_proxy_clip::run`, which is re-exported from `src/lib.rs`. Usage
-errors exit with status 2. Startup errors exit with status 1.
+errors exit with status 2. Startup errors exit with status 1. With the `clap`
+feature, `main` parses the optional runtime settings and passes them to `run`;
+without it, `Settings::default()` is used.
 
 `src/lib.rs` declares the modules and the shared `Res<T>` type:
 
@@ -62,9 +64,14 @@ Each accepted client gets one `Arc<Connection>` from `src/state.rs`.
 
 ```text
 Connection
+  settings: Settings
   state:    Mutex<ProxyState>
   commands: Mutex<VecDeque<Command>>
 ```
+
+`Settings` carries the runtime limits and timing copied from the process
+configuration: paste timeout, copy timeouts, idle poll interval, maximum text
+and image sizes, maximum image dimensions, and the GPU flag.
 
 `Command` is either `Paste` or `Copy`. Commands are queued by the control
 thread and consumed by the compositor-to-client worker.
@@ -221,7 +228,7 @@ injection directly to the client through an `FdWriter`.
 
 ## `paste`
 
-`paste` lends the host clipboard to the client for 15 seconds.
+`paste` lends the host clipboard to the client for 15 seconds by default.
 
 The command requires:
 
@@ -231,7 +238,7 @@ The command requires:
 
 If those conditions hold, `prepare`:
 
-1. Stores `Loan { offer, until: now + 15s }`.
+1. Stores `Loan { offer, until: now + settings.paste_timeout }`.
 2. Injects `wl_data_device.selection(offer)` into the client.
 
 The client can then request data from that offer. `filter::request` only
@@ -266,12 +273,14 @@ max_bytes  size limit for this kind of data
 timeout    read timeout for this kind of data
 ```
 
-Limits are:
+The defaults are:
 
 ```text
 text:  1 MiB, 15 second timeout
 image: 16 MiB, 30 second timeout
 ```
+
+They can be overridden when the binary is built with the `clap` feature.
 
 `prepare` creates a pipe with `pipe2` and `O_CLOEXEC`, starts a reader thread,
 and injects `wl_data_source.send(mime, write_end)` into the client. The client
@@ -361,8 +370,8 @@ to the client. The list covers the core compositor, shared memory, seats,
 outputs, XDG shell, decorations, output management, viewport, fractional
 scaling, presentation, single-pixel buffers, cursor shapes, text input v3,
 `wl_data_device_manager`, pointer constraints, relative pointers, and tearing
-control. `zwp_linux_dmabuf_v1` is intentionally absent unless GPU buffer
-forwarding is enabled.
+control. `zwp_linux_dmabuf_v1` is added when `Settings::should_support_gpu` is
+enabled, which is exposed as `--gpu` in the optional CLI.
 
 Everything else is hidden. This includes input methods, screen capture, layer
 shell, session lock, foreign-toplevel and workspace management, output and
@@ -408,7 +417,7 @@ connection.
 
 ## Module map
 
-- `src/main.rs`: argument parsing and process exit codes.
+- `src/main.rs`: argument parsing, optional Clap CLI, and process exit codes.
 - `src/lib.rs`: module list and public `run` entry point.
 - `src/server.rs`: listeners, control thread, connection workers.
 - `src/state.rs`: object tracking, clipboard state, command queue.
@@ -419,7 +428,7 @@ connection.
 - `src/image.rs`: PNG and JPEG header validation.
 - `src/wire.rs`: Wayland argument encoding and decoding helpers.
 - `src/fd.rs`: pipe, poll, and pending-byte helpers.
-- `src/config.rs`: timeouts, size limits, allowed globals.
+- `src/config.rs`: runtime settings, default limits, allowed globals.
 
 ## Tests
 
@@ -430,7 +439,7 @@ Unit tests cover:
 - refusal of unloaned host offer reads;
 - allowed text reads during a loan;
 - withholding the host selection event;
-- allowlisted global advertisement and removal;
+- allowlisted global advertisement and removal, including the GPU opt-in;
 - MIME preference and JPEG alias canonicalization;
 - PNG and JPEG header acceptance and rejection;
 - dimension limits and malformed headers.

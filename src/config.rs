@@ -1,13 +1,41 @@
 use std::time::Duration;
 
-pub(crate) const PASTE_WINDOW: Duration = Duration::from_secs(15);
-pub(crate) const COPY_TIMEOUT: Duration = Duration::from_secs(15);
-pub(crate) const IMAGE_COPY_TIMEOUT: Duration = Duration::from_secs(30);
-pub(crate) const IDLE_POLL_INTERVAL: Duration = Duration::from_millis(200);
-pub(crate) const MAX_TEXT_BYTES: usize = 1024 * 1024;
-pub(crate) const MAX_IMAGE_BYTES: usize = 16 * 1024 * 1024;
-pub(crate) const MAX_IMAGE_PIXELS: u64 = 64_000_000;
+const DEFAULT_PASTE_TIMEOUT: Duration = Duration::from_secs(15);
+const DEFAULT_COPY_TIMEOUT: Duration = Duration::from_secs(15);
+const DEFAULT_IMAGE_COPY_TIMEOUT: Duration = Duration::from_secs(30);
+const DEFAULT_IDLE_POLL_INTERVAL: Duration = Duration::from_millis(200);
+const DEFAULT_MAX_TEXT_BYTES: usize = 1024 * 1024;
+const DEFAULT_MAX_IMAGE_BYTES: usize = 16 * 1024 * 1024;
+const DEFAULT_MAX_IMAGE_PIXELS: u64 = 64_000_000;
+
 pub(crate) const READ_BUFFER_SIZE: usize = 64 * 1024;
+
+#[derive(Clone, Copy, Debug)]
+pub struct Settings {
+    pub paste_timeout:      Duration,
+    pub copy_timeout:       Duration,
+    pub image_copy_timeout: Duration,
+    pub idle_poll_interval: Duration,
+    pub max_text_bytes:     usize,
+    pub max_image_bytes:    usize,
+    pub max_image_pixels:   u64,
+    pub should_support_gpu: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            paste_timeout:      DEFAULT_PASTE_TIMEOUT,
+            copy_timeout:       DEFAULT_COPY_TIMEOUT,
+            image_copy_timeout: DEFAULT_IMAGE_COPY_TIMEOUT,
+            idle_poll_interval: DEFAULT_IDLE_POLL_INTERVAL,
+            max_text_bytes:     DEFAULT_MAX_TEXT_BYTES,
+            max_image_bytes:    DEFAULT_MAX_IMAGE_BYTES,
+            max_image_pixels:   DEFAULT_MAX_IMAGE_PIXELS,
+            should_support_gpu: false,
+        }
+    }
+}
 
 /// Globals exposed to the client. Everything else is hidden.
 ///
@@ -37,5 +65,9 @@ pub(crate) const ALLOWED_GLOBALS: &[&str] = &[
     "zwp_pointer_constraints_v1",
     "zwp_relative_pointer_manager_v1",
     "wp_tearing_control_manager_v1",
-    // Add "zwp_linux_dmabuf_v1" only when GPU buffer forwarding is enabled.
 ];
+
+pub(crate) fn is_allowed_global(interface: &str, should_support_gpu: bool) -> bool {
+    ALLOWED_GLOBALS.contains(&interface) ||
+        (should_support_gpu && interface == "zwp_linux_dmabuf_v1")
+}

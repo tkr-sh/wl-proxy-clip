@@ -1,7 +1,10 @@
-use std::{
-    collections::{HashMap, VecDeque},
-    sync::{Mutex, MutexGuard},
-    time::Instant,
+use {
+    crate::config::Settings,
+    std::{
+        collections::{HashMap, VecDeque},
+        sync::{Mutex, MutexGuard},
+        time::Instant,
+    },
 };
 
 const DISPLAY_ID: u32 = 1;
@@ -45,18 +48,24 @@ pub(crate) enum Command {
 }
 
 pub(crate) struct Connection {
+    settings: Settings,
     state:    Mutex<ProxyState>,
     commands: Mutex<VecDeque<Command>>,
 }
 
 impl Connection {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(settings: Settings) -> Self {
         let mut state = ProxyState::default();
         state.objects.insert(DISPLAY_ID, ObjectKind::Display);
         Self {
-            state:    Mutex::new(state),
+            settings,
+            state: Mutex::new(state),
             commands: Mutex::new(VecDeque::new()),
         }
+    }
+
+    pub(crate) const fn settings(&self) -> Settings {
+        self.settings
     }
 
     pub(crate) fn state(&self) -> MutexGuard<'_, ProxyState> {

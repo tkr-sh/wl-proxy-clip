@@ -11,4 +11,4 @@ mod wire;
 
 pub(crate) type Res<T> = Result<T, String>;
 
-pub use server::run;
+pub use {config::Settings, server::run};

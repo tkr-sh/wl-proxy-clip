@@ -1,13 +1,6 @@
 use {
     crate::{
-        config::{
-            COPY_TIMEOUT,
-            IMAGE_COPY_TIMEOUT,
-            MAX_IMAGE_BYTES,
-            MAX_TEXT_BYTES,
-            PASTE_WINDOW,
-            READ_BUFFER_SIZE,
-        },
+        config::{READ_BUFFER_SIZE, Settings},
         fd::{pipe, readable},
         image,
         mime::{image_mime_for, is_text, text_mime_for},
@@ -36,21 +29,21 @@ struct CopyTarget {
 }
 
 impl CopyTarget {
-    fn from_mimes(mimes: &[String]) -> Option<Self> {
+    fn from_mimes(mimes: &[String], settings: Settings) -> Option<Self> {
         if let Some(image) = image_mime_for(mimes) {
             Some(Self {
                 request:   image.request,
                 host:      image.canonical,
-                max_bytes: MAX_IMAGE_BYTES,
-                timeout:   IMAGE_COPY_TIMEOUT,
+                max_bytes: settings.max_image_bytes,
+                timeout:   settings.image_copy_timeout,
             })
         } else {
             text_mime_for(mimes).map(|mime| {
                 Self {
                     request:   mime,
                     host:      mime,
-                    max_bytes: MAX_TEXT_BYTES,
-                    timeout:   COPY_TIMEOUT,
+                    max_bytes: settings.max_text_bytes,
+                    timeout:   settings.copy_timeout,
                 }
             })
         }
@@ -65,6 +58,7 @@ pub(crate) struct Injection {
 
 pub(crate) fn prepare(connection: &Connection) -> Vec<Injection> {
     let commands = connection.take_commands();
+    let settings = connection.settings();
     let mut state = connection.state();
     let mut output = Vec::new();
 
@@ -103,7 +97,7 @@ pub(crate) fn prepare(connection: &Connection) -> Vec<Injection> {
                 }
                 state.loan = Some(Loan {
                     offer,
-                    until: Instant::now() + PASTE_WINDOW,
+                    until: Instant::now() + settings.paste_timeout,
                 });
                 // wl_data_device.selection(offer)
                 output.push(Injection {
@@ -123,7 +117,7 @@ pub(crate) fn prepare(connection: &Connection) -> Vec<Injection> {
                 let Some(target) = state
                     .mimes
                     .get(&source)
-                    .and_then(|mimes| CopyTarget::from_mimes(mimes))
+                    .and_then(|mimes| CopyTarget::from_mimes(mimes, settings))
                 else {
                     eprintln!("copy: the client selection is neither text nor a supported image");
                     continue;
@@ -141,6 +135,7 @@ pub(crate) fn prepare(connection: &Connection) -> Vec<Injection> {
                         target.host,
                         target.max_bytes,
                         target.timeout,
+                        settings.max_image_pixels,
                     );
                 });
                 // wl_data_source.send(mime, fd): the client writes into the pipe.
@@ -163,6 +158,7 @@ fn read_into_host_clipboard(
     mime: &'static str,
     max_bytes: usize,
     timeout: Duration,
+    max_image_pixels: u64,
 ) {
     let deadline = Instant::now() + timeout;
     let mut file = std::fs::File::from(read_end);
@@ -195,7 +191,7 @@ fn read_into_host_clipboard(
     }
 
     let valid = if mime.starts_with("image/") {
-        image::validate(mime, &data)
+        image::validate(mime, &data, max_image_pixels)
     } else {
         std::str::from_utf8(&data).is_ok()
     };
@@ -211,5 +207,40 @@ fn read_into_host_clipboard(
         MimeType::Specific(mime.to_owned()),
     ) {
         eprintln!("copy: failed to write the host clipboard: {error}");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use {super::*, crate::config::Settings};
+
+    #[test]
+    fn copy_target_uses_text_settings() {
+        let settings = Settings {
+            max_text_bytes: 42,
+            copy_timeout: Duration::from_secs(7),
+            ..Settings::default()
+        };
+        let mimes = vec!["text/plain".to_owned()];
+
+        let target = CopyTarget::from_mimes(&mimes, settings).unwrap();
+
+        assert_eq!(target.max_bytes, 42);
+        assert_eq!(target.timeout, Duration::from_secs(7));
+    }
+
+    #[test]
+    fn copy_target_uses_image_settings() {
+        let settings = Settings {
+            max_image_bytes: 84,
+            image_copy_timeout: Duration::from_secs(9),
+            ..Settings::default()
+        };
+        let mimes = vec!["image/png".to_owned()];
+
+        let target = CopyTarget::from_mimes(&mimes, settings).unwrap();
+
+        assert_eq!(target.max_bytes, 84);
+        assert_eq!(target.timeout, Duration::from_secs(9));
     }
 }

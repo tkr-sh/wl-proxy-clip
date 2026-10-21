@@ -20,7 +20,12 @@
     repository = "https://github.com/tkr-sh/wl-proxy-clip"
     version = "0.1.0"
 
+[features]
+    clap = ["dep:clap"]
+    default = ["clap"]
+
 [dependencies]
+    clap = { version = "4", features = ["derive"], optional = true }
     libc = "0.2"
     uds = "0.4"
     wl-clipboard-rs = "0.9"

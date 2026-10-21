@@ -44,12 +44,9 @@ client application --> wl-proxy-clip --> host compositor
 
 By default nothing crosses the proxy:
 
-- the client never learns what the host copied;
+- the client never learns what the host copied
 - when the client copies, its selection stays there until an explicit `copy`
-  command.
-
-The proxy supports text plus PNG and JPEG images, and only exposes the
-clipboard on request.
+  command
 
 ## Commands
 
@@ -75,14 +72,17 @@ text. Commands apply to every active client connection.
 cargo build --release
 ```
 
+For the optional Clap-based CLI:
+
+```sh
+cargo build --release --features clap
+```
+
 Or with Nix:
 
 ```sh
 nix build
 ```
-
-The binary is `target/release/wl-proxy-clip` for Cargo, or
-`result/bin/wl-proxy-clip` for Nix.
 
 ## Usage
 
@@ -116,14 +116,35 @@ printf 'paste\n' | socat - UNIX-CONNECT:"$XDG_RUNTIME_DIR/wl-proxy-clip-control"
 printf 'copy\n'  | socat - UNIX-CONNECT:"$XDG_RUNTIME_DIR/wl-proxy-clip-control"
 ```
 
+## Optional CLI
+
+With the `clap` feature, every limit and timeout can be overridden:
+
+| Option | Default |
+| --- | --- |
+| `--max-text-bytes <BYTES>` | 1048576 |
+| `--max-image-bytes <BYTES>` | 16777216 |
+| `--max-image-pixels <PIXELS>` | 64000000 |
+| `--paste-timeout <SECONDS>` | 15 |
+| `--copy-timeout <SECONDS>` | 15 |
+| `--image-copy-timeout <SECONDS>` | 30 |
+| `--idle-poll-interval <MILLISECONDS>` | 200 |
+| `--gpu` | disabled |
+
+`--gpu` adds `zwp_linux_dmabuf_v1` to the global allowlist for GPU buffer
+forwarding. Without the `clap` feature, the defaults above are used.
+
+Run `wl-proxy-clip --help` for the generated help text.
+
 ## Behavior and limits
 
 - Text, PNG, and JPEG selections are supported for `copy`. Host to client
   `paste` remains text only.
-- The host clipboard is lent to the client for 15 seconds after `paste`.
+- The host clipboard is lent to the client for 15 seconds after `paste` by default.
 - Text `copy` has a 15 second timeout, a 1 MiB limit, and requires valid UTF-8.
+  These are the defaults and can be changed with the optional CLI.
 - Image `copy` has a 30 second timeout, a 16 MiB limit, and a 64 megapixel
-  limit. PNG and JPEG headers are checked before the data is copied.
+  limit by default. PNG and JPEG headers are checked before the data is copied.
 - Image data is validated by header only and is not re-encoded. Host
   applications still decode it, so treat images from the client as untrusted
   input.
@@ -132,6 +153,7 @@ printf 'copy\n'  | socat - UNIX-CONNECT:"$XDG_RUNTIME_DIR/wl-proxy-clip-control"
 - Only an allowlist of globals is exposed to the client. Input methods, screen
   capture, layer shell, session lock, window management, output control,
   clipboard managers, data-control, and similar protocols are hidden.
+  `zwp_linux_dmabuf_v1` is allowed only with `--gpu`.
 - `wl_registry.bind` is checked as well. Binding an interface outside the
   allowlist, an unadvertised global, a mismatched interface, or a version above
   the advertised version closes the connection.

@@ -500,6 +500,7 @@ dependencies = [
 name = "wl-proxy-clip"
 version = "0.1.0"
 dependencies = [
+ "clap",
  "libc",
  "uds",
  "wl-clipboard-rs",

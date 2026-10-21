@@ -1,3 +1,5 @@
+exclude = ["**/target/**", "target/**"]
+
 [formatting]
     column_width = 100
 

@@ -1,6 +1,7 @@
 use {
     crate::{
         Res,
+        config::Settings,
         state::{Command, Connection},
         transport,
     },
@@ -18,7 +19,7 @@ use {
 
 type Connections = Arc<Mutex<Vec<Weak<Connection>>>>;
 
-pub fn run(name: &str, downstream: &Path, control: &Path) -> Res<()> {
+pub fn run(name: &str, downstream: &Path, control: &Path, settings: Settings) -> Res<()> {
     let upstream = host_compositor_socket()?;
     let connections: Connections = Arc::default();
 
@@ -47,7 +48,7 @@ pub fn run(name: &str, downstream: &Path, control: &Path) -> Res<()> {
             },
         };
 
-        let connection = Arc::new(Connection::new());
+        let connection = Arc::new(Connection::new(settings));
         connections
             .lock()
             .expect("connection list lock poisoned")

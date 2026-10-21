@@ -2,7 +2,6 @@ use {
     crate::{
         Res,
         clipboard::prepare,
-        config::IDLE_POLL_INTERVAL,
         fd::{pending_bytes, readable},
         filter::{self, Verdict},
         state::Connection,
@@ -90,7 +89,7 @@ pub(crate) fn forward_requests(
     })? {
         let verdict = {
             let mut state = connection.state();
-            filter::request(&mut state, &packet)?
+            filter::request(&mut state, &packet, connection.settings())?
         };
         if verdict == Verdict::Forward {
             send(compositor, &packet, &mut pending_fds)?;
@@ -120,7 +119,10 @@ pub(crate) fn forward_events(
                     &injection.packet,
                 )?;
             }
-            if !readable(compositor.as_raw_fd(), IDLE_POLL_INTERVAL) {
+            if !readable(
+                compositor.as_raw_fd(),
+                connection.settings().idle_poll_interval,
+            ) {
                 continue;
             }
         }
@@ -135,7 +137,7 @@ pub(crate) fn forward_events(
 
         let verdict = {
             let mut state = connection.state();
-            filter::event(&mut state, &packet)?
+            filter::event(&mut state, &packet, connection.settings())?
         };
         if verdict == Verdict::Forward {
             send(client, &packet, &mut pending_fds)?;

@@ -1,7 +1,7 @@
 use {
     crate::{
         Res,
-        config::ALLOWED_GLOBALS,
+        config::{Settings, is_allowed_global},
         mime::is_text,
         state::{GlobalInfo, ObjectKind, ProxyState},
         wire::{read_string, read_uint},
@@ -17,7 +17,7 @@ pub(crate) enum Verdict {
 }
 
 /// Requests sent by the client to the compositor.
-pub(crate) fn request(state: &mut ProxyState, packet: &Packet) -> Res<Verdict> {
+pub(crate) fn request(state: &mut ProxyState, packet: &Packet, settings: Settings) -> Res<Verdict> {
     let kind = state.objects.get(&packet.id).copied();
     Ok(match (kind, packet.opcode) {
         // wl_display.get_registry(new_id)
@@ -36,7 +36,7 @@ pub(crate) fn request(state: &mut ProxyState, packet: &Packet) -> Res<Verdict> {
             let version = proto::read_arg_uint(&mut cursor)?;
             let id = proto::read_arg_uint(&mut cursor)?;
 
-            if !ALLOWED_GLOBALS.contains(&interface.as_str()) {
+            if !is_allowed_global(&interface, settings.should_support_gpu) {
                 return Err(format!(
                     "client attempted to bind disallowed global {interface}"
                 ));
@@ -121,7 +121,7 @@ pub(crate) fn request(state: &mut ProxyState, packet: &Packet) -> Res<Verdict> {
 }
 
 /// Events sent by the compositor to the client.
-pub(crate) fn event(state: &mut ProxyState, packet: &Packet) -> Res<Verdict> {
+pub(crate) fn event(state: &mut ProxyState, packet: &Packet, settings: Settings) -> Res<Verdict> {
     let kind = state.objects.get(&packet.id).copied();
     Ok(match (kind, packet.opcode) {
         // wl_display.delete_id(id)
@@ -138,7 +138,7 @@ pub(crate) fn event(state: &mut ProxyState, packet: &Packet) -> Res<Verdict> {
             let interface = read_string(&mut cursor)?;
             let version = proto::read_arg_uint(&mut cursor)?;
 
-            if ALLOWED_GLOBALS.contains(&interface.as_str()) {
+            if is_allowed_global(&interface, settings.should_support_gpu) {
                 state
                     .globals
                     .insert(name, GlobalInfo { interface, version });
@@ -238,7 +238,7 @@ mod tests {
             body:   bind_body("zwlr_screencopy_manager_v1", 1),
         };
 
-        assert!(request(&mut state, &packet).is_err());
+        assert!(request(&mut state, &packet, Settings::default()).is_err());
     }
 
     #[test]
@@ -250,7 +250,7 @@ mod tests {
             body:   bind_body("wl_compositor", 1),
         };
 
-        assert!(request(&mut state, &packet).is_err());
+        assert!(request(&mut state, &packet, Settings::default()).is_err());
     }
 
     #[test]
@@ -263,7 +263,7 @@ mod tests {
             body:   bind_body("wl_shm", 1),
         };
 
-        assert!(request(&mut state, &packet).is_err());
+        assert!(request(&mut state, &packet, Settings::default()).is_err());
     }
 
     #[test]
@@ -276,7 +276,10 @@ mod tests {
             body:   bind_body("wl_data_device_manager", 1),
         };
 
-        assert_eq!(request(&mut state, &packet).unwrap(), Verdict::Forward);
+        assert_eq!(
+            request(&mut state, &packet, Settings::default()).unwrap(),
+            Verdict::Forward
+        );
         assert_eq!(state.objects.get(&2), Some(&ObjectKind::Manager));
     }
 
@@ -290,7 +293,7 @@ mod tests {
             body:   bind_body("wl_compositor", 9),
         };
 
-        assert!(request(&mut state, &packet).is_err());
+        assert!(request(&mut state, &packet, Settings::default()).is_err());
     }
 
     #[test]
@@ -303,7 +306,10 @@ mod tests {
             body:   bind_body("wl_compositor", 3),
         };
 
-        assert_eq!(request(&mut state, &packet).unwrap(), Verdict::Forward);
+        assert_eq!(
+            request(&mut state, &packet, Settings::default()).unwrap(),
+            Verdict::Forward
+        );
     }
 
     #[test]
@@ -315,7 +321,7 @@ mod tests {
             body:   string_argument("text/plain"),
         };
 
-        assert!(request(&mut state, &packet).is_err());
+        assert!(request(&mut state, &packet, Settings::default()).is_err());
     }
 
     #[test]
@@ -331,7 +337,10 @@ mod tests {
             body:   string_argument("text/plain"),
         };
 
-        assert_eq!(request(&mut state, &packet).unwrap(), Verdict::Forward);
+        assert_eq!(
+            request(&mut state, &packet, Settings::default()).unwrap(),
+            Verdict::Forward
+        );
     }
 
     #[test]
@@ -343,7 +352,10 @@ mod tests {
             body:   Vec::new(),
         };
 
-        assert_eq!(request(&mut state, &packet).unwrap(), Verdict::Drop);
+        assert_eq!(
+            request(&mut state, &packet, Settings::default()).unwrap(),
+            Verdict::Drop
+        );
     }
 
     #[test]
@@ -355,7 +367,10 @@ mod tests {
             body:   9u32.to_ne_bytes().to_vec(),
         };
 
-        assert_eq!(event(&mut state, &packet).unwrap(), Verdict::Drop);
+        assert_eq!(
+            event(&mut state, &packet, Settings::default()).unwrap(),
+            Verdict::Drop
+        );
         assert_eq!(state.host_offer, Some(9));
     }
 
@@ -368,7 +383,10 @@ mod tests {
             body:   global_body(7, "wl_compositor", 6),
         };
 
-        assert_eq!(event(&mut state, &packet).unwrap(), Verdict::Forward);
+        assert_eq!(
+            event(&mut state, &packet, Settings::default()).unwrap(),
+            Verdict::Forward
+        );
         let global = state.globals.get(&7).unwrap();
         assert_eq!(global.interface, "wl_compositor");
         assert_eq!(global.version, 6);
@@ -383,8 +401,67 @@ mod tests {
             body:   global_body(7, "zwlr_screencopy_manager_v1", 1),
         };
 
-        assert_eq!(event(&mut state, &packet).unwrap(), Verdict::Drop);
+        assert_eq!(
+            event(&mut state, &packet, Settings::default()).unwrap(),
+            Verdict::Drop
+        );
         assert!(!state.globals.contains_key(&7));
+    }
+
+    #[test]
+    fn hides_gpu_global_by_default() {
+        let mut state = state_with(ObjectKind::Registry, 2);
+        let packet = Packet {
+            id:     2,
+            opcode: 0,
+            body:   global_body(7, "zwp_linux_dmabuf_v1", 4),
+        };
+
+        assert_eq!(
+            event(&mut state, &packet, Settings::default()).unwrap(),
+            Verdict::Drop
+        );
+        assert!(!state.globals.contains_key(&7));
+    }
+
+    #[test]
+    fn enables_gpu_global_with_setting() {
+        let mut state = state_with(ObjectKind::Registry, 2);
+        let packet = Packet {
+            id:     2,
+            opcode: 0,
+            body:   global_body(7, "zwp_linux_dmabuf_v1", 4),
+        };
+        let settings = Settings {
+            should_support_gpu: true,
+            ..Settings::default()
+        };
+
+        assert_eq!(
+            event(&mut state, &packet, settings).unwrap(),
+            Verdict::Forward
+        );
+        assert!(state.globals.contains_key(&7));
+    }
+
+    #[test]
+    fn binds_gpu_global_when_enabled() {
+        let mut state = state_with(ObjectKind::Registry, 2);
+        advertise_global(&mut state, 1, "zwp_linux_dmabuf_v1", 4);
+        let packet = Packet {
+            id:     2,
+            opcode: 0,
+            body:   bind_body("zwp_linux_dmabuf_v1", 1),
+        };
+        let settings = Settings {
+            should_support_gpu: true,
+            ..Settings::default()
+        };
+
+        assert_eq!(
+            request(&mut state, &packet, settings).unwrap(),
+            Verdict::Forward
+        );
     }
 
     #[test]
@@ -397,7 +474,10 @@ mod tests {
             body:   7u32.to_ne_bytes().to_vec(),
         };
 
-        assert_eq!(event(&mut state, &packet).unwrap(), Verdict::Forward);
+        assert_eq!(
+            event(&mut state, &packet, Settings::default()).unwrap(),
+            Verdict::Forward
+        );
         assert!(!state.globals.contains_key(&7));
     }
 }

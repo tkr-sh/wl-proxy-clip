@@ -1,18 +1,16 @@
-use crate::config::MAX_IMAGE_PIXELS;
-
 const PNG_SIGNATURE: &[u8] = b"\x89PNG\r\n\x1a\n";
 const PNG_IHDR_LENGTH: [u8; 4] = 13u32.to_be_bytes();
 const JPEG_START: [u8; 2] = [0xff, 0xd8];
 
-pub(crate) fn validate(mime: &str, data: &[u8]) -> bool {
+pub(crate) fn validate(mime: &str, data: &[u8], max_pixels: u64) -> bool {
     match mime {
-        "image/png" => valid_png(data),
-        "image/jpeg" => valid_jpeg(data),
+        "image/png" => valid_png(data, max_pixels),
+        "image/jpeg" => valid_jpeg(data, max_pixels),
         _ => false,
     }
 }
 
-fn valid_png(data: &[u8]) -> bool {
+fn valid_png(data: &[u8], max_pixels: u64) -> bool {
     if data.len() < 33 ||
         !data.starts_with(PNG_SIGNATURE) ||
         data.get(8..12) != Some(&PNG_IHDR_LENGTH) ||
@@ -27,10 +25,10 @@ fn valid_png(data: &[u8]) -> bool {
     let Some(height) = read_be_u32(data, 20) else {
         return false;
     };
-    valid_dimensions(width, height)
+    valid_dimensions(width, height, max_pixels)
 }
 
-fn valid_jpeg(data: &[u8]) -> bool {
+fn valid_jpeg(data: &[u8], max_pixels: u64) -> bool {
     if data.get(..2) != Some(&JPEG_START) {
         return false;
     }
@@ -82,7 +80,7 @@ fn valid_jpeg(data: &[u8]) -> bool {
             let Some(width) = read_be_u16(data, offset + 5) else {
                 return false;
             };
-            if !valid_dimensions(u32::from(width), u32::from(height)) {
+            if !valid_dimensions(u32::from(width), u32::from(height), max_pixels) {
                 return false;
             }
             found_frame = true;
@@ -100,8 +98,8 @@ const fn is_start_of_frame(marker: u8) -> bool {
     )
 }
 
-fn valid_dimensions(width: u32, height: u32) -> bool {
-    width > 0 && height > 0 && u64::from(width) * u64::from(height) <= MAX_IMAGE_PIXELS
+fn valid_dimensions(width: u32, height: u32, max_pixels: u64) -> bool {
+    width > 0 && height > 0 && u64::from(width) * u64::from(height) <= max_pixels
 }
 
 fn read_be_u32(data: &[u8], offset: usize) -> Option<u32> {
@@ -116,7 +114,11 @@ fn read_be_u16(data: &[u8], offset: usize) -> Option<u16> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use {super::*, crate::config::Settings};
+
+    fn max_pixels() -> u64 {
+        Settings::default().max_image_pixels
+    }
 
     fn png_header(width: u32, height: u32) -> Vec<u8> {
         let mut data = PNG_SIGNATURE.to_vec();
@@ -140,12 +142,21 @@ mod tests {
 
     #[test]
     fn accepts_valid_png_header() {
-        assert!(validate("image/png", &png_header(1920, 1080)));
+        assert!(validate("image/png", &png_header(1920, 1080), max_pixels()));
     }
 
     #[test]
     fn rejects_png_with_oversized_dimensions() {
-        assert!(!validate("image/png", &png_header(10_000, 10_000)));
+        assert!(!validate(
+            "image/png",
+            &png_header(10_000, 10_000),
+            max_pixels()
+        ));
+    }
+
+    #[test]
+    fn respects_custom_pixel_limit() {
+        assert!(!validate("image/png", &png_header(10, 10), 50));
     }
 
     #[test]
@@ -153,26 +164,38 @@ mod tests {
         let mut data = png_header(10, 10);
         *data.first_mut().expect("PNG header is not empty") = 0;
 
-        assert!(!validate("image/png", &data));
+        assert!(!validate("image/png", &data, max_pixels()));
     }
 
     #[test]
     fn accepts_valid_jpeg_header() {
-        assert!(validate("image/jpeg", &jpeg_header(1920, 1080)));
+        assert!(validate(
+            "image/jpeg",
+            &jpeg_header(1920, 1080),
+            max_pixels()
+        ));
     }
 
     #[test]
     fn rejects_jpeg_with_oversized_dimensions() {
-        assert!(!validate("image/jpeg", &jpeg_header(10_000, 10_000)));
+        assert!(!validate(
+            "image/jpeg",
+            &jpeg_header(10_000, 10_000),
+            max_pixels()
+        ));
     }
 
     #[test]
     fn rejects_truncated_jpeg() {
-        assert!(!validate("image/jpeg", &[0xff, 0xd8, 0xff, 0xc0]));
+        assert!(!validate(
+            "image/jpeg",
+            &[0xff, 0xd8, 0xff, 0xc0],
+            max_pixels()
+        ));
     }
 
     #[test]
     fn rejects_unknown_image_mime() {
-        assert!(!validate("image/svg+xml", b"<svg/>"));
+        assert!(!validate("image/svg+xml", b"<svg/>", max_pixels()));
     }
 }

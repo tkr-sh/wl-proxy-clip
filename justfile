@@ -75,7 +75,14 @@ ci-build:
     cargo build --locked --release
 
 [group: 'ci']
-ci: ci-fmt ci-machete ci-deny ci-check ci-clippy ci-test ci-build
+ci-features:
+    cargo check --locked --all-targets --all-features
+    cargo clippy --locked --all-targets --all-features -- -D warnings
+    cargo nextest run --locked --all-features
+    cargo build --locked --release --all-features
+
+[group: 'ci']
+ci: ci-fmt ci-machete ci-deny ci-check ci-clippy ci-test ci-build ci-features
 
 [group: 'release']
 release version:
