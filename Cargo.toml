@@ -1,9 +1,15 @@
 [package]
+    authors = ["tkr-sh"]
+    categories = ["command-line-utilities", "network-programming", "security"]
     description = "Wayland clipboard isolation proxy"
     edition = "2024"
+    exclude = [".editorconfig", ".github", "ARCHITECTURE.md", "flake.lock", "flake.nix", "justfile"]
+    keywords = ["clipboard", "isolation", "proxy", "security", "wayland"]
     license = "GPL-3.0-or-later"
     name = "wl-proxy-clip"
-    version = "0.0.1"
+    readme = "README.md"
+    repository = "https://github.com/tkr-sh/wl-proxy-clip"
+    version = "0.1.0"
 
 [dependencies]
     libc = "0.2"
