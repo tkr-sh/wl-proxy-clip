@@ -1,9 +1,14 @@
 [package]
+    description = "Wayland clipboard isolation proxy"
     edition = "2024"
-    name = "project"
+    name = "wl-proxy-clip"
     version = "0.0.1"
 
 [dependencies]
+    libc = "0.2"
+    uds = "0.4"
+    wl-clipboard-rs = "0.9"
+    wlproxy = "0.2"
 
 
 # <https://rust-lang.github.io/rust-clippy/master>
@@ -101,7 +106,6 @@
     doc_link_code = "warn"
     fallible_impl_from = "warn"
     format_push_string = "warn"
-    from_iter_instead_of_collect = "warn"
     implicit_clone = "warn"
     items_after_statements = "warn"
     literal_string_with_formatting_args = "warn"
