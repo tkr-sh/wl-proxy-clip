@@ -88,15 +88,12 @@
                 }
             );
 
-            apps = eachSystem (
-                system:
-                {
-                    default = {
-                        type = "app";
-                        program = lib.getExe self.packages.${system}.default;
-                    };
-                }
-            );
+            apps = eachSystem (system: {
+                default = {
+                    type = "app";
+                    program = lib.getExe self.packages.${system}.default;
+                };
+            });
 
             devShells = eachSystem (
                 system:
