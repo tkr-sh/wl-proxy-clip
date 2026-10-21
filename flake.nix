@@ -1,9 +1,8 @@
 {
-    description = "Project flake";
+    description = "Wayland clipboard isolation proxy";
 
     inputs = {
         nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-        systems.url = "github:nix-systems/default";
 
         rust-overlay = {
             url = "github:oxalica/rust-overlay";
@@ -20,14 +19,17 @@
         {
             self,
             nixpkgs,
-            systems,
             rust-overlay,
             crane,
             ...
         }:
         let
             lib = nixpkgs.lib;
-            eachSystem = lib.genAttrs (import systems);
+            systems = [
+                "aarch64-linux"
+                "x86_64-linux"
+            ];
+            eachSystem = lib.genAttrs systems;
 
             mkPkgs =
                 system:
@@ -49,16 +51,9 @@
                 };
         in
         {
-            overlays.default =
-                final: _prev:
-                let
-                    craneLib = (crane.mkLib final).overrideToolchain toolchainFor;
-                    src = craneLib.cleanCargoSource ./.;
-                    inherit (craneLib.crateNameFromCargoToml { inherit src; }) pname;
-                in
-                {
-                    ${pname} = self.packages.${final.stdenv.hostPlatform.system}.default;
-                };
+            overlays.default = final: _prev: {
+                wl-proxy-clip = self.packages.${final.stdenv.hostPlatform.system}.default;
+            };
 
             packages = eachSystem (
                 system:
@@ -67,36 +62,34 @@
                     craneLib = (crane.mkLib pkgs).overrideToolchain toolchainFor;
 
                     src = craneLib.cleanCargoSource ./.;
-                    # Automatically read pname and version from Cargo.toml
                     inherit (craneLib.crateNameFromCargoToml { inherit src; }) pname version;
 
                     commonArgs = {
                         inherit src;
                         strictDeps = true;
-                        nativeBuildInputs = [ pkgs.pkg-config ];
-                        buildInputs = [ pkgs.openssl ];
                     };
 
                     cargoArtifacts = craneLib.buildDepsOnly commonArgs;
-
-                    my-crate = craneLib.buildPackage (
+                in
+                {
+                    default = craneLib.buildPackage (
                         commonArgs
                         // {
                             inherit cargoArtifacts pname version;
-                            doCheck = false; # Tests run via `just`, not nix
+                            meta = {
+                                description = "Wayland clipboard isolation proxy";
+                                homepage = "https://github.com/tkr-sh/wl-proxy-clip";
+                                license = lib.licenses.gpl3Plus;
+                                mainProgram = "wl-proxy-clip";
+                                platforms = lib.platforms.linux;
+                            };
                         }
                     );
-                in
-                {
-                    default = my-crate;
                 }
             );
 
             apps = eachSystem (
                 system:
-                let
-                    pkgs = mkPkgs system;
-                in
                 {
                     default = {
                         type = "app";
@@ -110,17 +103,9 @@
                 let
                     pkgs = mkPkgs system;
                     craneLib = (crane.mkLib pkgs).overrideToolchain toolchainFor;
-
-                    commonArgs = {
-                        src = craneLib.cleanCargoSource ./.;
-                        strictDeps = true;
-                        nativeBuildInputs = [ pkgs.pkg-config ];
-                        buildInputs = [ pkgs.openssl ];
-                    };
                 in
                 {
                     default = craneLib.devShell {
-                        inherit (commonArgs) buildInputs nativeBuildInputs;
                         packages = with pkgs; [
                             just
                             nushell
