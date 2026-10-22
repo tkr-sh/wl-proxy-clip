@@ -503,6 +503,8 @@ dependencies = [
  "clap",
  "libc",
  "uds",
+ "wayland-client",
+ "wayland-protocols",
  "wl-clipboard-rs",
  "wlproxy",
 ]

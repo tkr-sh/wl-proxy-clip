@@ -27,6 +27,8 @@
     clap = { version = "4", features = ["derive"], optional = true }
     libc = "0.2"
     uds = "0.4"
+    wayland-client = "0.31"
+    wayland-protocols = { version = "0.32", features = ["client", "staging"] }
     wl-clipboard-rs = "0.9"
     wlproxy = "0.2"
 

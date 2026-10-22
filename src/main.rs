@@ -12,7 +12,7 @@ mod cli {
     #[derive(Parser)]
     #[command(version, about)]
     struct Args {
-        /// Name used in log messages.
+        /// Name used in log messages and as the security context instance ID.
         name:       String,
         /// Downstream Wayland socket.
         downstream: PathBuf,

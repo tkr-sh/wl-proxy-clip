@@ -15,7 +15,9 @@ client application -> wl-proxy-clip -> host compositor
 
 The proxy accepts a downstream Unix socket, connects to the host compositor,
 and forwards Wayland messages in both directions. It only interprets the
-small part of the protocol needed for clipboard control.
+small part of the protocol needed for clipboard control. The compositor-facing
+side of that connection is registered through `wp_security_context_manager_v1`
+when the compositor supports it, so the compositor can tag it with the VM name.
 
 The default state is isolation:
 
@@ -51,14 +53,52 @@ pub(crate) type Res<T> = Result<T, String>;
 
 1. Resolve the compositor socket from `$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY`.
    If `WAYLAND_DISPLAY` is unset, use `wayland-0`.
-2. Bind the control socket and start one control thread.
-3. Bind the downstream Wayland socket.
-4. Accept downstream connections forever.
-5. For each accepted client, connect to the compositor and start two worker
-   threads.
+2. Select the upstream socket (`src/security.rs`). If
+   `WL_PROXY_CLIP_SECURITY_CONTEXT` is set, use that listener supplied by the
+   launcher. Otherwise register a security context with
+   `instance_id = <name>` and use its listener. If the compositor does not
+   support security contexts, connect to the compositor socket directly.
+3. Bind the control socket and start one control thread.
+4. Bind the downstream Wayland socket.
+5. Accept downstream connections forever.
+6. For each accepted client, connect upstream and start two worker threads.
 
 The design uses blocking I/O and one thread per direction. There is no async
 runtime.
+
+## Security context tagging
+
+`src/security.rs` registers the proxy's upstream connections with the
+compositor's `wp_security_context_manager_v1` global.
+
+A short-lived bootstrap connection discovers the global. When it is present,
+the proxy:
+
+1. creates a listening Unix socket in `$XDG_RUNTIME_DIR`;
+2. creates a pipe used as the security context's close notification;
+3. calls `wp_security_context_manager_v1.create_listener` with the listening
+   socket and the pipe read end;
+4. sets the sandbox engine, `app_id = <name>`, and `instance_id = <name>`;
+5. commits the context and waits for a roundtrip;
+6. closes the bootstrap connection but keeps the pipe write end open.
+
+The compositor accepts new connections on the listening socket and attaches
+the committed security context to them. Every accepted downstream client is
+then connected upstream through that socket, so all client traffic carries the
+VM tag. The kernel denies access to the listening socket through the
+permissions of `$XDG_RUNTIME_DIR`.
+
+The close pipe write end is owned by `SecurityContext`. Closing it, including
+on process exit, signals the compositor to stop accepting connections. The
+socket is removed from the filesystem when the context is dropped.
+
+A launcher that already registered a security context can pass its listening
+socket path in `WL_PROXY_CLIP_SECURITY_CONTEXT`; the proxy then uses that
+socket and does not register another context. Launcher-registered sockets are
+expected to have been committed with `instance_id = <name>` as well.
+
+When the compositor does not advertise the security context manager, the proxy
+logs a warning and connects directly to the compositor socket.
 
 ## Per-connection state
 
@@ -386,6 +426,11 @@ shell, session lock, foreign-toplevel and workspace management, output and
 gamma control, DRM leases, virtual input, primary selection, data-control,
 security contexts, activation, and idle notification protocols.
 
+`wp_security_context_manager_v1` is hidden from the client as well. The proxy
+uses it only on its private bootstrap connection, never on the client side of
+the proxy. Clients therefore cannot create nested contexts or obtain an
+untagged compositor connection.
+
 There are two enforcement layers:
 
 1. `wl_registry.global` events outside the allowlist are dropped and not
@@ -428,6 +473,7 @@ connection.
 - `src/main.rs`: argument parsing, default Clap CLI, and process exit codes.
 - `src/lib.rs`: module list and public `run` entry point.
 - `src/server.rs`: listeners, control thread, connection workers.
+- `src/security.rs`: upstream security context registration and selection.
 - `src/state.rs`: object tracking, clipboard state, command queue.
 - `src/filter.rs`: request and event filtering rules.
 - `src/transport.rs`: packet forwarding and fd passing.
@@ -450,7 +496,9 @@ Unit tests cover:
 - allowlisted global advertisement and removal, including the GPU opt-in;
 - MIME preference and JPEG alias canonicalization;
 - PNG and JPEG header acceptance and rejection;
-- dimension limits and malformed headers.
+- dimension limits and malformed headers;
+- security context registration, instance and app IDs, and launcher-provided
+  security context sockets.
 
 Run the full check with:
 

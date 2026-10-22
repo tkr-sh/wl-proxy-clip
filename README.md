@@ -64,6 +64,8 @@ text. Commands apply to every active client connection.
 
 - Linux with a Wayland compositor that supports `ext-data-control` or
   `wlr-data-control`
+- Optionally, a compositor that supports `wp_security_context_manager_v1` for
+  upstream connection tagging
 - Rust with edition 2024 support, or Nix
 
 ## Build
@@ -93,12 +95,23 @@ wl-proxy-clip [OPTIONS] <name> <downstream-socket> <control-socket>
 The default build includes the CLI options described below. A build made with
 `--no-default-features` accepts only the three positional arguments.
 
-- `<name>` is only used in log messages.
+- `<name>` is used in log messages and as the security context instance ID.
 - `<downstream-socket>` is the Wayland socket that the client connects to.
 - `<control-socket>` receives `paste` and `copy` commands.
 
 The host compositor is found through `$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY`.
 When `WAYLAND_DISPLAY` is unset, `wayland-0` is used.
+
+When the compositor supports `wp_security_context_manager_v1`, `wl-proxy-clip`
+tags its upstream connection with a security context registered with
+`instance_id = <name>` and `app_id = <name>`. Each VM therefore gets its own
+compositor-visible tag, while the proxy's internal clipboard connection keeps
+using the untagged compositor socket.
+
+If a launcher has already registered a security context listener for the VM,
+set `WL_PROXY_CLIP_SECURITY_CONTEXT` to that socket path. `wl-proxy-clip` then
+uses the launcher's listener instead of registering its own. Compositors
+without security context support are connected directly, with a warning.
 
 Example:
 
@@ -167,6 +180,9 @@ Run `wl-proxy-clip --help` for the generated help text.
 - `wl_registry.bind` is checked as well. Binding an interface outside the
   allowlist, an unadvertised global, a mismatched interface, or a version above
   the advertised version closes the connection.
+- The compositor-facing connection is registered through a security context
+  with `instance_id = <name>` when the compositor supports it. The security
+  context manager itself stays hidden from the client.
 
 `wl-proxy-clip` is a clipboard isolation aid, not a complete sandbox. It
 filters the Wayland objects it needs to understand, but it is not a substitute

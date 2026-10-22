@@ -2,6 +2,7 @@ use {
     crate::{
         Res,
         config::Settings,
+        security,
         state::{Command, Connection},
         transport,
     },
@@ -20,7 +21,8 @@ use {
 type Connections = Arc<Mutex<Vec<Weak<Connection>>>>;
 
 pub fn run(name: &str, downstream: &Path, control: &Path, settings: Settings) -> Res<()> {
-    let upstream = host_compositor_socket()?;
+    let compositor = host_compositor_socket()?;
+    let upstream = security::upstream(&compositor, name)?;
     let connections: Connections = Arc::default();
 
     serve_control(listen(control)?, Arc::clone(&connections));
@@ -28,7 +30,7 @@ pub fn run(name: &str, downstream: &Path, control: &Path, settings: Settings) ->
     eprintln!(
         "wl-proxy-clip[{name}]: {} -> {}",
         downstream.display(),
-        upstream.display()
+        upstream.describe()
     );
     let listener = listen(downstream)?;
 
@@ -40,7 +42,7 @@ pub fn run(name: &str, downstream: &Path, control: &Path, settings: Settings) ->
                 continue;
             },
         };
-        let compositor = match UnixStream::connect(&upstream) {
+        let compositor = match upstream.connect() {
             Ok(stream) => stream,
             Err(error) => {
                 eprintln!("failed to connect to compositor: {error}");

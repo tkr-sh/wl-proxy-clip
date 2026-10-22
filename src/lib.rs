@@ -4,6 +4,7 @@ mod fd;
 mod filter;
 mod image;
 mod mime;
+mod security;
 mod server;
 mod state;
 mod transport;
